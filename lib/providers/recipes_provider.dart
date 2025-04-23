@@ -38,14 +38,18 @@ class RecipesProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> addRecipe(Recipe recipe) async { 
+    recipes.add(recipe);
+    notifyListeners();
+  }
+
   Future<void> toggleFavoritesStatus(Recipe recipe) async {
     final isFavorite = favoriteRecipe.contains(recipe);
     try {
       final url = Uri.parse('http://10.0.2.2:12346/favorites');
-      final response =
-          isFavorite
-              ? await http.delete(url, body: json.encode({"id": recipe.id}))
-              : await http.post(url, body: json.encode(recipe.toJson()));
+      final response = isFavorite
+          ? await http.delete(url, body: json.encode({"id": recipe.id}))
+          : await http.post(url, body: json.encode(recipe.toJson()));
 
       if (response.statusCode == 200) {
         if (isFavorite) {

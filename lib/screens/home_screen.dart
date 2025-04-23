@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:recipe_book/models/recipe_model.dart';
 import 'package:recipe_book/providers/recipes_provider.dart';
 import 'package:recipe_book/screens/recipe_detail.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -45,11 +46,28 @@ class HomeScreen extends StatelessWidget {
   Future<void> _showBottom(BuildContext context) {
     return showModalBottomSheet(
       context: context,
-      builder: (contexto) => Container(
-        width: MediaQuery.of(context).size.width,
-        height: 500,
-        color: Colors.white,
-        child: ReciperForm(),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              top: 16,
+              left: 16,
+              right: 16,
+            ),
+            child: SingleChildScrollView(
+              controller: scrollController,
+              child: ReciperForm(),
+            ),
+          );
+        },
       ),
     );
   }
@@ -119,10 +137,11 @@ class ReciperForm extends StatefulWidget {
 }
 
 class _ReciperFormState extends State<ReciperForm> {
-  final TextEditingController _recipeName = TextEditingController();
-  final TextEditingController _recipeAuthor = TextEditingController();
-  final TextEditingController _recipeImage = TextEditingController();
-  final TextEditingController _recipeDescription = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _recipeName = TextEditingController();
+  final _recipeAuthor = TextEditingController();
+  final _recipeImage = TextEditingController();
+  final _recipeDescription = TextEditingController();
 
   @override
   void dispose() {
@@ -135,60 +154,12 @@ class _ReciperFormState extends State<ReciperForm> {
 
   @override
   Widget build(BuildContext context) {
-    final _formKey = GlobalKey<FormState>();
-
-    final fields = [
-      {
-        'label': 'Recipe Name',
-        'maxLines': 1,
-        'controller': _recipeName,
-        'validator': (String? value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter the recipe name';
-          }
-          return null;
-        },
-      },
-      {
-        'label': 'Author',
-        'maxLines': 1,
-        'controller': _recipeAuthor,
-        'validator': (String? value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter the author';
-          }
-          return null;
-        },
-      },
-      {
-        'label': 'Image Url',
-        'maxLines': 1,
-        'controller': _recipeImage,
-        'validator': (String? value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter the image URL';
-          }
-          return null;
-        },
-      },
-      {
-        'label': 'Recipe',
-        'maxLines': 4,
-        'controller': _recipeDescription,
-        'validator': (String? value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter the recipe';
-          }
-          return null;
-        },
-      },
-    ];
-
     return Padding(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(16),
       child: Form(
         key: _formKey,
         child: Column(
+          mainAxisSize: MainAxisSize.min, // ¡IMPORTANTE!
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
@@ -196,67 +167,58 @@ class _ReciperFormState extends State<ReciperForm> {
               style: TextStyle(color: Colors.orange, fontSize: 24),
             ),
             const SizedBox(height: 16),
-            ...fields.map(
-              (field) => Column(
-                children: [
-                  _buildTextField(
-                    label: field['label'] as String,
-                    controller: field['controller'] as TextEditingController,
-                    validator: field['validator'] as String? Function(String?),
-                    maxLines: field['maxLines'] as int,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-            SizedBox(height: 16),
+            _buildTextField("Recipe Name", _recipeName),
+            const SizedBox(height: 12),
+            _buildTextField("Author", _recipeAuthor),
+            const SizedBox(height: 12),
+            _buildTextField("Image Url", _recipeImage),
+            const SizedBox(height: 12),
+            _buildTextField("Recipe", _recipeDescription, maxLines: 4),
+            const SizedBox(height: 24),
             Center(
               child: ElevatedButton(
-                onPressed: () => {
-                  if (_formKey.currentState!.validate())
-                    {Navigator.pop(context)},
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    final newRecipe = Recipe(
+                      id: DateTime.now()
+                          .millisecondsSinceEpoch, // ID único temporal
+                      name: _recipeName.text,
+                      author: _recipeAuthor.text,
+                      image_link: _recipeImage.text,
+                      recipe: _recipeDescription.text
+                          .split('\n'), // ✅ ahora es List<String>
+                    );
+
+                    Provider.of<RecipesProvider>(context, listen: false)
+                        .addRecipe(newRecipe);
+
+                    Navigator.pop(context);
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
                 ),
-                child: Text(
-                  'Save Recipe',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: const Text('Save Recipe'),
               ),
-            ),
+            )
           ],
         ),
       ),
     );
   }
-}
 
-Widget _buildTextField({
-  required String label,
-  required TextEditingController controller,
-  required String? Function(String?) validator,
-  int maxLines = 1,
-}) {
-  return TextFormField(
-    controller: controller,
-    validator: validator,
-    maxLines: maxLines,
-    decoration: InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(fontFamily: 'Quicksand', color: Colors.orange),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      focusedBorder: OutlineInputBorder(
-        borderSide: BorderSide(color: Colors.orange, width: 1),
-        borderRadius: BorderRadius.circular(10),
+  Widget _buildTextField(String label, TextEditingController controller,
+      {int maxLines = 1}) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(),
+        labelStyle: TextStyle(fontFamily: 'Quicksand', color: Colors.orange),
       ),
-    ),
-  );
+      validator: (value) =>
+          (value == null || value.isEmpty) ? 'Please enter $label' : null,
+    );
+  }
 }
